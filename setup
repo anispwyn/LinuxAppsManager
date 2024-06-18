@@ -62,18 +62,47 @@ read -p "Enter your choice: " choice
 
 if [ $choice -eq 1 ]; then
     echo ""
-    # This script adds the lam function definition to the appropriate shell configuration file
-
     # Check if the configuration file exists
-    if [ -f ~/."$shell"rc ]; then
+    if [ "$shell" = "fish" ]; then
+        config_file="$HOME/.config/fish/config.fish"
+    else
+        config_file="$HOME/.${shell}rc"
+    fi
+
+    if [ -f "$config_file" ]; then
         # Check if the lam function is already defined in the file
-        if grep -q "lam ()" ~/."$shell"rc; then
+        if grep -q "function lam" "$config_file"; then
             # Delete the existing lam function
-            sed -i '/lam ()/,/^}/d' ~/."$shell"rc
+            sed -i '/function lam/,/^end/d' "$config_file"
+            # Delete the existing alias
+            sed -i '/alias lam="lam_function"/d' "$config_file"
         fi
 
         # Append the function definition to the end of the file
-        tail -c1 ~/."$shell"rc | read -r _ || echo "" >>~/."$shell"rc && cat >>~/."$shell"rc <<EOF
+        if [ "$shell" = "fish" ]; then
+            echo "" >> "$config_file"
+            cat >> "$config_file" <<EOF
+function lam_function
+  # Define the target directory
+  set target_dir "$pwd"
+
+  # Change to the target directory
+  cd \$target_dir
+
+  # Check if manager exists
+  if test -f manager
+    chmod +x manager
+    ./manager
+  else
+    echo "Linux Apps Manager is not available in your system."
+  end
+end
+
+alias lam="lam_function"
+EOF
+        else
+            tail -c1 "$config_file" | read -r _ || echo "" >> "$config_file"
+            cat >> "$config_file" <<EOF
 lam () {
   # Go to the saved directory
   cd "$pwd"
@@ -85,7 +114,10 @@ lam () {
     echo "Linux Apps Manager is not available in your system."
   fi
 }
+
 EOF
+        fi
+
         echo -e "${AQUA}Linux Apps Manager has been successfully installed on your system. Important notes:${NC}"
         echo "• To run Linux Apps Manager, type 'lam' in terminal."
         echo "• Don't delete the directory where you cloned the repository."
@@ -97,12 +129,13 @@ EOF
         $shell
 
     else
-        # Print an error message & make ."$shell"rc file
-        echo -e "${RED}."$shell"rc file not found.${NC}"
+        # Print an error message & create the config file
+        echo -e "${RED}${config_file} file not found.${NC}"
         sleep 1
         echo -e "${GREEN}Fixing this issue...${NC}"
         sleep 3
-        touch ~/."$shell"rc
+        mkdir -p "$(dirname "$config_file")"
+        touch "$config_file"
         echo -e "${AQUA}Issue fixed. Try option 1 again.${NC}"
         sleep 3
         chmod +x setup && ./setup
@@ -110,22 +143,33 @@ EOF
 
 elif [ $choice -eq 2 ]; then
     echo ""
-    # Check if the lam function is defined in the .shellrc file
-    if grep -q "lam ()" ~/."$shell"rc; then
-        # Delete function and directory
-        sed -i '/lam ()/,/^}/d' ~/."$shell"rc
-        rm -rf "$pwd"
-        if [ $? -eq 0 ]; then # check the exit status of rm command
-            echo -e "${GREEN}Uninstalled successfully.${NC}"
-            sleep 3
-            exit_script
-        else
-            echo -e "${RED}Failed to uninstall!${NC}"
+    # Check if the lam function is defined in the config file
+    if [ "$shell" = "fish" ]; then
+        config_file="$HOME/.config/fish/config.fish"
+    else
+        config_file="$HOME/.${shell}rc"
+    fi
+
+    if [ "$shell" = "fish" ]; then
+        if grep -q "function lam" "$config_file"; then
+            # Delete function and alias
+            sed -i '/function lam/,/^end/d' "$config_file"
+            sed -i '/alias lam="lam_function"/d' "$config_file"
         fi
     else
-        echo -e "${AQUA}Linux Apps Manager isn't available in your system.${NC}"
+        if grep -q "lam ()" "$config_file"; then
+            # Delete function and alias
+            sed -i '/lam ()/,/^}/d' "$config_file"
+        fi
+    fi
+
+    rm -rf "$pwd"
+    if [ $? -eq 0 ]; then # check the exit status of rm command
+        echo -e "${GREEN}Uninstalled successfully.${NC}"
         sleep 3
-        chmod +x setup && ./setup
+        exit_script
+    else
+        echo -e "${RED}Failed to uninstall!${NC}"
     fi
 
 elif [ $choice -eq 3 ]; then
